@@ -50,13 +50,13 @@ const nextConfig = {
 };
 ```
 
-`NEXT_PUBLIC_BASE_PATH` is optional. Leave it empty for a custom domain such as `www.makcu.com`. Set it to `/<repo-name>` when serving from a project Pages URL without a custom domain.
+`NEXT_PUBLIC_BASE_PATH` is optional. Leave it empty for the custom domain `makcu.com`. Set it to `/<repo-name>` when serving from a project Pages URL without a custom domain.
 
 ## GitHub Pages Deployment
 
 The workflow in `.github/workflows/pages.yml`:
 
-1. Runs on pushes to `makcu.com` and manual dispatch.
+1. Runs on pushes to `main` and manual dispatch.
 2. Checks out the repo with submodules.
 3. Uses Node 24 and pnpm 11.18.0.
 4. Runs `pnpm install --frozen-lockfile`.

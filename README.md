@@ -10,7 +10,7 @@ Official MAKCU documentation and browser tools site built with Next.js and expor
 ## Setup
 
 ```bash
-git clone https://github.com/MakcuTeam/Website project-name
+git clone https://github.com/terrafirma2021/makcu.com project-name
 cd project-name
 git submodule sync
 git submodule update --init --recursive
@@ -47,8 +47,8 @@ pnpm start
 
 ## GitHub Pages Deployment
 
-Deployment is handled by `.github/workflows/pages.yml` on pushes to `makcu.com` and manual workflow runs.
+Deployment is handled by `.github/workflows/pages.yml` on pushes to `main` and manual workflow runs.
 
-In the repository settings, set Pages source to **GitHub Actions**. For a custom domain such as `www.makcu.com`, configure the domain in GitHub Pages settings and leave `NEXT_PUBLIC_BASE_PATH` unset. For project Pages without a custom domain, set the repository variable `NEXT_PUBLIC_BASE_PATH` to `/<repo-name>`.
+In the repository settings, set Pages source to **GitHub Actions**. For the custom domain `makcu.com`, configure the domain in GitHub Pages settings and leave `NEXT_PUBLIC_BASE_PATH` unset. For project Pages without a custom domain, set the repository variable `NEXT_PUBLIC_BASE_PATH` to `/<repo-name>`.
 
 The firmware list is loaded directly from the public GitHub contents API in the browser because GitHub Pages does not run server API routes.
