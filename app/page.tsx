@@ -3,20 +3,14 @@ import { getBasePath } from "@/lib/site-paths";
 
 export default function LocaleRedirectPage() {
   const locales = getLocales();
-  const fallbackLocale = locales[0] || "en";
+  const fallbackLocale = locales.includes("en") ? "en" : locales[0] || "en";
   const basePath = getBasePath();
 
   const redirectScript = `
 (() => {
-  const supported = ${JSON.stringify(locales)};
   const fallback = ${JSON.stringify(fallbackLocale)};
   const basePath = ${JSON.stringify(basePath)};
-  const language = (navigator.language || "").toLowerCase();
-  const languages = [language, ...(navigator.languages || []).map((item) => item.toLowerCase())];
-  const matched = languages.find((item) => supported.includes(item) || item.startsWith("zh"));
-  const locale = matched ? (matched.startsWith("zh") ? "cn" : matched.split("-")[0]) : fallback;
-  const targetLocale = supported.includes(locale) ? locale : fallback;
-  const target = basePath + "/" + targetLocale + "/";
+  const target = basePath + "/" + fallback + "/";
   window.location.replace(target + window.location.search + window.location.hash);
 })();
   `.trim();
