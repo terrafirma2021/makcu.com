@@ -2,24 +2,25 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
+import { withBasePath } from "@/lib/site-paths";
 
 export function BackgroundVideo() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  
+
   // Determine if we're in light mode - check HTML class directly for accuracy
   const [isLightMode, setIsLightMode] = useState(false);
 
   useEffect(() => {
     if (!mounted) return;
-    
+
     const checkTheme = () => {
       const htmlElement = document.documentElement;
       const hasDarkClass = htmlElement.classList.contains("dark");
       const isLight = theme === "light" || !hasDarkClass;
       setIsLightMode(isLight);
-      
+
       console.log("🎨 Video theme check:", {
         theme,
         hasDarkClass,
@@ -58,12 +59,7 @@ export function BackgroundVideo() {
     setMounted(true);
   }, []);
 
-  // GitHub raw URL - works even if file isn't deployed to Vercel
-  // Repo: https://github.com/MakcuTeam/Website
-  // Browser will automatically cache this video in temp files based on HTTP headers
-  // When users return, browser loads from cache (no download needed)
-  const githubVideoSrc = "https://raw.githubusercontent.com/MakcuTeam/Website/main/public/background.mp4";
-  const fallbackVideoSrc = "/background.mp4";
+  const videoSrc = withBasePath("/background.mp4");
 
   useEffect(() => {
     if (!videoRef.current || !mounted) return;
@@ -75,7 +71,7 @@ export function BackgroundVideo() {
     video.muted = true;
     video.playsInline = true;
     video.preload = "auto";
-    
+
     // Track if video was loaded from cache (for debugging)
     const startTime = performance.now();
     let loadedFromCache = false;
@@ -105,14 +101,14 @@ export function BackgroundVideo() {
 
     const handleCanPlay = () => {
       const loadTime = performance.now() - startTime;
-      const cacheStatus = loadedFromCache || loadTime < 200 
-        ? "✓ Loaded from browser cache (no download)" 
+      const cacheStatus = loadedFromCache || loadTime < 200
+        ? "✓ Loaded from browser cache (no download)"
         : "↓ Downloaded from network (will be cached for next visit)";
-      
+
       console.log("✓ Background video ready:", cacheStatus);
       console.log("  Source:", video.currentSrc);
       console.log("  Load time:", Math.round(loadTime), "ms");
-      
+
       playVideo();
     };
 
@@ -149,7 +145,7 @@ export function BackgroundVideo() {
 
   // Determine filter value
   const videoFilter = isLightMode ? "invert(1) brightness(1.2)" : "none";
-  
+
   // Debug filter value
   useEffect(() => {
     if (mounted) {
@@ -188,10 +184,7 @@ export function BackgroundVideo() {
       autoPlay
       preload="auto"
     >
-      {/* Primary source: GitHub raw URL (will be cached by browser) */}
-      <source src={githubVideoSrc} type="video/mp4" />
-      {/* Fallback: Local file if GitHub source fails */}
-      <source src={fallbackVideoSrc} type="video/mp4" />
+      <source src={videoSrc} type="video/mp4" />
       Your browser does not support the video element.
     </video>
   );

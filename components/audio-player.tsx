@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef } from "react";
 import { useAudio } from "@/components/contexts/audio-provider";
+import { withBasePath } from "@/lib/site-paths";
 
 export function AudioPlayer() {
   const { audioRef, gainNodeRef, hasInteracted, setHasInteracted, setIsMuted } = useAudio();
@@ -17,33 +18,32 @@ export function AudioPlayer() {
 
     const audio = audioRef.current;
     
-    // GitHub raw URLs don't support CORS for Web Audio API, so we use HTML5 audio volume control
-    // Set volume directly using HTML5 audio API (more reliable for cross-origin sources)
+    // Set volume directly using HTML5 audio API.
     audio.volume = 0.25; // 25% volume
     gainNodeRef.current = null; // Don't use Web Audio API
     audioContextRef.current = null;
     
-    console.log("🔊 Using HTML5 audio volume control (0.25 = 25%)");
-    console.log("🔊 Audio src:", audio.src || audio.querySelector("source")?.src);
-    console.log("🔊 Note: Web Audio API skipped due to GitHub raw URL CORS limitations");
+    console.log("ðŸ”Š Using HTML5 audio volume control (0.25 = 25%)");
+    console.log("ðŸ”Š Audio src:", audio.src || audio.querySelector("source")?.src);
+    console.log("ðŸ”Š Note: Web Audio API skipped; HTML5 volume is enough here");
     
-    // Set initial state - ALWAYS use HTML5 audio volume (Web Audio API blocked by CORS)
+    // Set initial state using HTML5 audio volume.
     audio.volume = 0.25; // 25% volume
     audio.muted = true;
     setIsMuted(true);
-    console.log("🔊 Initial audio volume set to:", audio.volume, "(25%)");
+    console.log("ðŸ”Š Initial audio volume set to:", audio.volume, "(25%)");
     
     // Force volume function - ensures volume stays at 25% using HTML5 audio volume
     const enforceVolume = () => {
       if (Math.abs(audio.volume - 0.25) > 0.01) {
-        console.warn("⚠️ Volume changed from", audio.volume, "to 0.25 (25%)");
+        console.warn("âš ï¸ Volume changed from", audio.volume, "to 0.25 (25%)");
         audio.volume = 0.25;
       }
     };
     
     // Add event listeners for debugging and volume enforcement
     const handleLoadedData = () => {
-      console.log("🔊 Audio loaded successfully, readyState:", audio.readyState);
+      console.log("ðŸ”Š Audio loaded successfully, readyState:", audio.readyState);
       enforceVolume();
     };
     
@@ -56,25 +56,25 @@ export function AudioPlayer() {
         
         // Error code 2 = NETWORK ERROR (file not found)
         if (audio.error.code === 2) {
-          console.error("❌ NETWORK ERROR: Audio file not found!");
-          console.error("💡 File should be at: https://www.makcu.com/audio.mp3");
-          console.error("💡 Make sure public/audio.mp3 is committed and deployed to Vercel");
+          console.error("âŒ NETWORK ERROR: Audio file not found!");
+          console.error("ðŸ’¡ File should be at: https://www.makcu.com/audio.mp3");
+          console.error("ðŸ’¡ Make sure public/audio.mp3 is committed and deployed");
         }
       }
     };
     
     const handlePlay = () => {
       enforceVolume();
-      console.log("🔊 Audio play event - Volume:", audio.volume, "(expected: 0.25)", "Muted:", audio.muted);
+      console.log("ðŸ”Š Audio play event - Volume:", audio.volume, "(expected: 0.25)", "Muted:", audio.muted);
     };
 
     const handleVolumeChange = () => {
-      console.log("🔊 Volume changed event - Current volume:", audio.volume, "(expected: 0.25)");
+      console.log("ðŸ”Š Volume changed event - Current volume:", audio.volume, "(expected: 0.25)");
       enforceVolume();
     };
 
     const handleCanPlayThrough = () => {
-      console.log("🔊 Audio can play through, readyState:", audio.readyState);
+      console.log("ðŸ”Š Audio can play through, readyState:", audio.readyState);
       enforceVolume();
     };
     
@@ -111,11 +111,11 @@ export function AudioPlayer() {
       
       // Set HTML5 audio volume to 25%
       audio.volume = 0.25;
-      console.log("🔊 User interaction - Setting HTML5 volume to 0.25 (25%)");
-      console.log("🔊 Current volume:", audio.volume);
+      console.log("ðŸ”Š User interaction - Setting HTML5 volume to 0.25 (25%)");
+      console.log("ðŸ”Š Current volume:", audio.volume);
       
       setIsMuted(false);
-      console.log("🔊 Audio state - Muted:", audio.muted);
+      console.log("ðŸ”Š Audio state - Muted:", audio.muted);
       
       // CRITICAL: play() MUST be called synchronously in the event handler
       // This is Chrome's requirement for user gesture
@@ -124,13 +124,13 @@ export function AudioPlayer() {
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            console.log("✓ Audio playing! duration:", audio.duration, "seconds");
-            console.log("🔊 Volume after play:", audio.volume, "(expected: 0.25)");
-            console.log("🔊 Muted state:", audio.muted);
+            console.log("âœ“ Audio playing! duration:", audio.duration, "seconds");
+            console.log("ðŸ”Š Volume after play:", audio.volume, "(expected: 0.25)");
+            console.log("ðŸ”Š Muted state:", audio.muted);
             setHasInteracted(true);
           })
           .catch((error) => {
-            console.error("✗ Play failed:", error.name, error.message);
+            console.error("âœ— Play failed:", error.name, error.message);
             
             // If it failed because audio isn't loaded, load and retry
             if (audio.readyState === 0) {
@@ -140,10 +140,10 @@ export function AudioPlayer() {
                 audio.oncanplaythrough = null;
                 audio.muted = false;
                 audio.volume = 0.25;
-                console.log("🔊 Retry - Setting HTML5 volume to 0.25 (25%)");
+                console.log("ðŸ”Š Retry - Setting HTML5 volume to 0.25 (25%)");
                 audio.play()
                   .then(() => {
-                    console.log("✓ Retry successful! Volume:", audio.volume, "(expected: 0.25)");
+                    console.log("âœ“ Retry successful! Volume:", audio.volume, "(expected: 0.25)");
                     setHasInteracted(true);
                   })
                   .catch((e) => {
@@ -179,7 +179,7 @@ export function AudioPlayer() {
     const audio = audioRef.current;
     const volumeCheckInterval = setInterval(() => {
       if (!audio.muted && Math.abs(audio.volume - 0.25) > 0.01) {
-        console.warn("⚠️ Volume was changed to", audio.volume, "- resetting to 0.25 (25%)");
+        console.warn("âš ï¸ Volume was changed to", audio.volume, "- resetting to 0.25 (25%)");
         audio.volume = 0.25;
       }
     }, 1000); // Check every second
@@ -187,10 +187,7 @@ export function AudioPlayer() {
     return () => clearInterval(volumeCheckInterval);
   }, [audioRef]);
 
-  // Use GitHub raw URL directly - works even if file isn't deployed to Vercel
-  // Repo: https://github.com/MakcuTeam/Website
-  // This loads directly from GitHub, bypassing Vercel deployment issues
-  const audioSrc = "https://raw.githubusercontent.com/MakcuTeam/Website/main/public/audio.mp3";
+  const audioSrc = withBasePath("/audio.mp3");
 
   return (
     <audio 

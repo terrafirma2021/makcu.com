@@ -16,19 +16,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ESPLoader, FlashOptions, LoaderOptions, Transport, FlashModeValues, FlashFreqValues } from "@/esp_tool_fix/lib/index.js";
-import { serial } from "web-serial-polyfill";
+import { ESPLoader, FlashOptions, Transport } from "esptool-js";
 import { Dictionary } from "@/lib/dictionaries";
 import { Locale } from "@/lib/locale";
 import Loading from "./Loading";
 import { toast } from "sonner";
 import { DebugWindow, DebugWindowRef } from "@/components/DebugWindow";
-import { Buffer } from "buffer";
 import { useMakcuConnection } from "./contexts/makcu-connection-provider";
-
-// Treat both native and polyfilled serial ports as the Web Serial API's
-// SerialPort to satisfy esptool-js' Transport constructor at runtime.
-type SerialPortLike = SerialPort;
+import { listMakcuFirmwareFiles } from "@/lib/github-assets";
+import { createSingleImageFlashOptions } from "@/lib/esptool-flash";
 
 interface DataListType {
   name: string;
@@ -67,49 +63,30 @@ export const DeviceTool: React.FC<{ lang: Locale; dict: Dictionary }> = ({ lang,
     debugRef.current?.addInfo(info);
   };
 
-  const handleClearInfo = () => {
-    debugRef.current?.clearInfo();
-  };
-
   const [onlineDataList, setOnlineDataList] = useState<DataListType[]>([]);
   const [leftFiles, setLeftFiles] = useState<DataListType[]>([]);
   const [rightFiles, setRightFiles] = useState<DataListType[]>([]);
 
   const fetchOnlineDataList = async () => {
     try {
-      const res = await fetch("/api/makcu");
-      if (!res.ok) throw new Error("network");
-      try {
-        const raw: unknown = await res.json();
-        if (!Array.isArray(raw)) {
-          throw new Error("Invalid data format received from server.");
-        }
-        const dataList = (raw as DataListType[]).filter(
-          (item) => !!item.downloadUrl,
-        );
-        dataList.sort((a, b) =>
-          b.name.localeCompare(a.name, undefined, { numeric: true }),
-        );
-        const filesBySide = {} as Record<
-          keyof typeof sideFilters,
-          DataListType[]
-        >;
-        (Object.keys(sideFilters) as (keyof typeof sideFilters)[]).forEach(
-          (side) => {
-            filesBySide[side] = getFilesBySide(dataList, side);
-          },
-        );
-        setLeftFiles(filesBySide.left);
-        setRightFiles(filesBySide.right);
-        setOnlineDataList(dataList);
-      } catch (err) {
-        console.error("Failed to parse online data list", err);
-        handleAddInfo("Failed to parse online data list");
-        toast.error("Failed to parse online data list");
-        setLeftFiles([]);
-        setRightFiles([]);
-        setOnlineDataList([]);
-      }
+      const dataList = (await listMakcuFirmwareFiles()).filter(
+        (item) => !!item.downloadUrl,
+      );
+      dataList.sort((a, b) =>
+        b.name.localeCompare(a.name, undefined, { numeric: true }),
+      );
+      const filesBySide = {} as Record<
+        keyof typeof sideFilters,
+        DataListType[]
+      >;
+      (Object.keys(sideFilters) as (keyof typeof sideFilters)[]).forEach(
+        (side) => {
+          filesBySide[side] = getFilesBySide(dataList, side);
+        },
+      );
+      setLeftFiles(filesBySide.left);
+      setRightFiles(filesBySide.right);
+      setOnlineDataList(dataList);
     } catch (error) {
       console.error("Failed to fetch online data list", error);
       handleAddInfo(
@@ -140,11 +117,11 @@ export const DeviceTool: React.FC<{ lang: Locale; dict: Dictionary }> = ({ lang,
 
   const [progress, setProgress] = useState(0);
   const [onlineSelect, setOnlineSelect] = useState<string>();
-  
+
   // Use global connection context
-  const { status, mode, transport, loader, connect, disconnect, browserSupported: contextBrowserSupported } = useMakcuConnection();
+  const { status, mode, transport, loader, browserSupported: contextBrowserSupported } = useMakcuConnection();
   const isCn = lang === "cn";
-  
+
   // Sync global connection state with local state
   useEffect(() => {
     if (status === "connected" && mode === "flash") {
@@ -155,7 +132,7 @@ export const DeviceTool: React.FC<{ lang: Locale; dict: Dictionary }> = ({ lang,
       setEsploader(null);
     }
   }, [status, mode, transport, loader]);
-  
+
   // Check if device is in normal mode on load
   useEffect(() => {
     if (status === "connected" && mode === "normal" && dict) {
@@ -164,30 +141,6 @@ export const DeviceTool: React.FC<{ lang: Locale; dict: Dictionary }> = ({ lang,
   }, [status, mode, dict]);
 
   const fileRef = useRef<HTMLInputElement>(null);
-  const isConnecting = useRef(false);
-
-  const flushWebCaches = async () => {
-    if (typeof window === "undefined" || typeof navigator === "undefined") return;
-    try {
-      if ("caches" in window) {
-        const keys = await caches.keys();
-        await Promise.all(keys.map((key) => caches.delete(key)));
-      }
-      if ("serviceWorker" in navigator && navigator.serviceWorker?.getRegistrations) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(registrations.map((registration) => registration.update()));
-      }
-      handleAddInfo("Cleared cached assets before establishing serial connection.");
-    } catch (error) {
-      console.warn("Failed to flush caches", error);
-      handleAddInfo("Warning: unable to fully clear cached assets before connecting.");
-    }
-  };
-
-
-  const Navigator = navigator as Navigator & { serial?: Serial; usb?: unknown };
-  const serialLib =
-    !Navigator.serial && Navigator.usb ? serial : Navigator.serial;
 
   // No need for local disconnect handlers - the global connection provider handles everything
   // The device and esploader will automatically update when the global state changes
@@ -198,35 +151,10 @@ export const DeviceTool: React.FC<{ lang: Locale; dict: Dictionary }> = ({ lang,
     }
   }, [device]);
 
-  const connectToDevice = async () => {
-    // Use global connection - it will try normal mode first, then flash mode
-    await connect();
-  };
-
   const createFlashOptions = (buffer: ArrayBuffer): FlashOptions => {
-    const data = Buffer.from(buffer).toString("binary");
-    const chip = esploader?.chip as {
-      flashMode?: FlashModeValues;
-      flashFreq?: FlashFreqValues;
-      flashSize?: string;
-    } | undefined;
-    const flashMode: FlashModeValues = (chip?.flashMode ?? "dio") as FlashModeValues;
-    const flashFreq: FlashFreqValues = (chip?.flashFreq ?? "40m") as FlashFreqValues;
-    return {
-      fileArray: [
-        {
-          data,
-          address: 0x0,
-        },
-      ],
-      eraseAll: false,
-      compress: true,
-      flashMode,
-      flashFreq,
-      reportProgress(fileIndex, written, total) {
-        setProgress((written / total) * 100);
-      },
-    };
+    return createSingleImageFlashOptions(buffer, (fileIndex, written, total) => {
+      setProgress((written / total) * 100);
+    });
   };
 
   const executeFlash = async (
@@ -234,7 +162,7 @@ export const DeviceTool: React.FC<{ lang: Locale; dict: Dictionary }> = ({ lang,
     firmwareName: string,
   ) => {
     if (!esploader) return;
-    
+
     // Check if device is in normal mode
     if (status === "connected" && mode === "normal") {
       toast.error(dict?.device_control.warnings.normal_mode_detected || "Cannot flash in normal mode. Please disconnect and reconnect in flash mode.");
@@ -413,7 +341,7 @@ export const DeviceTool: React.FC<{ lang: Locale; dict: Dictionary }> = ({ lang,
           </div>
         </CardContent>
       </Card>
-      
+
       {device && (
         <Card className="border-border/60 bg-card/90 shadow-lg">
           <CardContent className="p-6">

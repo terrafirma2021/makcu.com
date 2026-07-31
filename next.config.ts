@@ -1,8 +1,13 @@
 import type { NextConfig } from "next";
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+
 const nextConfig: NextConfig = {
-  /* config options here */
+  output: "export",
+  trailingSlash: true,
+  ...(basePath ? { basePath } : {}),
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: "https",
@@ -10,9 +15,6 @@ const nextConfig: NextConfig = {
         pathname: "/**",
       },
     ],
-  },
-  eslint: {
-    ignoreDuringBuilds: true
   },
 };
 

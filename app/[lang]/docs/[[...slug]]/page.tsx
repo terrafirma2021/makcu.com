@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { getDocsForSlug } from "@/lib/markdown";
 import { Typography } from "@/components/typography";
 import { getDictionary } from "@/lib/dictionaries";
+import { getLocales } from "@/lib/locale-server";
 import { Locale } from "@/lib/locale";
 
 type PageProps = {
@@ -53,7 +54,10 @@ export async function generateMetadata(props: PageProps) {
 }
 
 export function generateStaticParams() {
-  return page_routes.map((item) => ({
-    slug: item.href.split("/").slice(1),
-  }));
+  return getLocales().flatMap((lang) =>
+    page_routes.map((item) => ({
+      lang,
+      slug: item.href.split("/").slice(1),
+    })),
+  );
 }

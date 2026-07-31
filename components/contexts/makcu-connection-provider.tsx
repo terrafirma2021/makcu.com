@@ -1,8 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from "react";
-import { ESPLoader, LoaderOptions, Transport } from "@/esp_tool_fix/lib/index.js";
-import { serial } from "web-serial-polyfill";
+import { ESPLoader, LoaderOptions, Transport } from "esptool-js";
 import { toast } from "sonner";
 
 // Import all modular functions and types
@@ -45,7 +44,6 @@ import {
   UART0_CMD_GET_FAULT,
   BAUD_RATES,
   SERIAL_PORT_CONFIG,
-  CONNECTION_DELAYS,
   CONNECTION_TIMEOUTS,
   DEVICE_INFO_COOKIE,
   DEVICE_INFO_EXPIRY_HOURS,
@@ -59,7 +57,6 @@ import {
   registerApiCommandParser,
   // Utils
   calculateTimeout,
-  openPortWithBaudRate,
   safeClosePort,
   getComPort,
   setCookie,
@@ -70,6 +67,14 @@ import {
 // Protocol functions (binary framing/parsing) now in makcu/protocol.ts
 
 // Parser functions, command registry, and cookie utilities are now in makcu/parsers.ts and makcu/utils.ts
+
+const FLASH_PORT_FILTERS: SerialPortFilter[] = [
+  { usbVendorId: 0x303a }, // ESP32-S3 native USB/JTAG serial
+  { usbVendorId: 0x1a86, usbProductId: 0x55d3 }, // WCH CH343
+  { usbVendorId: 0x1a86, usbProductId: 0x7523 }, // WCH CH340
+  { usbVendorId: 0x10c4 }, // Silicon Labs CP210x
+  { usbVendorId: 0x0403 }, // FTDI
+];
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * Build Device Info from Individual Command Responses
@@ -233,7 +238,7 @@ export function getCombinedDeviceInfo(mcuStatus: MakcuStatus | null): Record<str
 
 const MakcuConnectionContext = createContext<MakcuConnectionContextType | undefined>(undefined);
 
-// Utility functions (calculateTimeout, openPortWithBaudRate, safeClosePort, getComPort) are now imported from makcu/utils.ts
+// Utility functions (calculateTimeout, safeClosePort, getComPort) are now imported from makcu/utils.ts
 
 export function MakcuConnectionProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<MakcuConnectionState>({
@@ -318,149 +323,6 @@ export function MakcuConnectionProvider({ children }: { children: React.ReactNod
     return msg.toLowerCase().includes("read timeout exceeded");
   };
 
-  // Try to connect in normal mode with specific baud rate and timeout
-  // Uses lightweight STATUS command (17-byte payload) instead of full WEBSITE (360+ bytes)
-  // This keeps connection fast while still confirming link health
-  const tryNormalMode = async (port: SerialPort, baudRate: number, timeout?: number, _maxRetries?: number): Promise<boolean> => {
-    const calculatedTimeout = timeout ?? calculateTimeout(baudRate, CONNECTION_TIMEOUTS.STATUS_FRAME_BYTES, CONNECTION_TIMEOUTS.SILENCE_SYMBOLS, false);
-    
-    console.log(`[TRY NORMAL MODE] Baud: ${baudRate}, Timeout: ${calculatedTimeout}ms, Retries: 1 (CRC removed)`);
-    
-    if (!port.writable || !port.readable) {
-      console.log("[TRY NORMAL MODE] Port not readable/writable");
-      return false;
-    }
-
-    await new Promise(resolve => setTimeout(resolve, CONNECTION_DELAYS.PORT_STABILIZATION));
-
-    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
-    let writer: WritableStreamDefaultWriter<Uint8Array> | null = null;
-    try {
-      writer = port.writable.getWriter();
-      if (!writer) {
-        console.log("[TRY NORMAL MODE] Failed to get writer");
-        return false;
-      }
-      const binaryCommand = buildBinaryFrame(UART0_CMD_STATUS, null);
-      console.log("[TRY NORMAL MODE] Single attempt using STATUS command (no CRC)");
-      await writer.write(binaryCommand);
-      writer.releaseLock();
-      writer = null;
-
-      reader = port.readable.getReader();
-      const currentReader = reader;
-
-      let timeoutId: NodeJS.Timeout | null = null;
-      const timeoutPromise = new Promise<Uint8Array | null>((resolve) => {
-        timeoutId = setTimeout(() => {
-          currentReader.cancel().catch(() => {});
-          resolve(null);
-        }, calculatedTimeout);
-      });
-
-      const readPromise = (async (): Promise<Uint8Array | null> => {
-        const chunks: Uint8Array[] = [];
-        try {
-          while (true) {
-            const { value, done } = await currentReader.read();
-            if (done) break;
-            if (value) {
-              chunks.push(value);
-
-              const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-              const combined = new Uint8Array(totalLength);
-              let offset = 0;
-              for (const chunk of chunks) {
-                combined.set(chunk, offset);
-                offset += chunk.length;
-              }
-
-              let frameStart = -1;
-              for (let i = 0; i < combined.length; i++) {
-                if (combined[i] === UART0_START_BYTE) {
-                  frameStart = i;
-                  break;
-                }
-              }
-
-              if (frameStart >= 0 && combined.length >= frameStart + 4) {
-                const payloadLen = combined[frameStart + 2] | (combined[frameStart + 3] << 8);
-                const totalFrameLen = 4 + payloadLen;
-
-                if (combined.length >= frameStart + totalFrameLen) {
-                  const parsed = parseBinaryFrame(combined.slice(frameStart, frameStart + totalFrameLen));
-                  if (parsed && parsed.cmd === UART0_CMD_STATUS) {
-                    if (timeoutId) clearTimeout(timeoutId);
-                    return parsed.payload;
-                  }
-                }
-              }
-
-              if (totalLength > 100) break;
-            }
-          }
-        } catch (e) {
-          // Read error
-        }
-        return null;
-      })();
-
-      const response = await Promise.race([readPromise, timeoutPromise]);
-      if (timeoutId) clearTimeout(timeoutId);
-      
-      if (reader) {
-        try {
-          await reader.cancel();
-        } catch (e) {
-          // Ignore cancel errors
-        }
-        try {
-          reader.releaseLock();
-        } catch (e) {
-          // Ignore release errors
-        }
-        reader = null;
-      }
-      
-      if (response && response.length >= 17 && response[0] === 0x01) {
-        const status = parseStatusResponse(response);
-        if (status) {
-          console.log(`[CONNECTION CHECK] STATUS parsed: RAM=${status.freeRamKb}kb, UPTIME=${status.uptime}s, TEMP=${status.temp >= 0 ? status.temp.toFixed(1) + '°C' : 'N/A'}, Device=${status.deviceAttached ? 'attached' : 'detached'}`);
-          setMcuStatus(status);
-          lastDeviceAttachedRef.current = status.deviceAttached;
-        }
-        return true;
-      }
-
-      console.warn("[TRY NORMAL MODE] No valid STATUS response on single attempt");
-      return false;
-    } catch (error) {
-      console.error("[TRY NORMAL MODE] Error:", error);
-      return false;
-    } finally {
-      // Always release locks in finally block to ensure cleanup
-      if (writer) {
-        try {
-          writer.releaseLock();
-        } catch (e) {
-          // Ignore
-        }
-      }
-      if (reader) {
-        try {
-          await reader.cancel();
-        } catch (e) {
-          // Ignore
-        }
-        try {
-          reader.releaseLock();
-        } catch (e) {
-          // Ignore
-        }
-      }
-    }
-  };
-
   // Try to connect in flash mode
       // Note: Flash mode uses its own baud rates (FLASH_MODE for flash, ROM_BOOTLOADER for ROM)
   // The website baud rate setting is ignored - ESPLoader handles its own baud rates
@@ -483,12 +345,11 @@ export function MakcuConnectionProvider({ children }: { children: React.ReactNod
       // Helper to build loader options
       const buildFlashOptions = (transport: Transport): LoaderOptions => ({
         transport,
-        // Connect at 115200 (ROM) then bump to 921600 for flashing.
-        // Note: romBaudrate is hardcoded to 115200 in ESPLoader, not configurable
-        baudrate: BAUD_RATES.FLASH_MODE,   // 921600 for flashing
-        flashSize: "detect",               // Auto-detect flash size
-        enableTracing: true,               // Enable byte-level TRACE logs in console
-        debugLogging: false,               // Keep esptool-js debug logs off
+        // Keep the whole ROM/stub session at 115200. This matches stable ESP32-S3
+        // browser flashers and avoids native USB dropouts during baud changes.
+        baudrate: BAUD_RATES.ROM_BOOTLOADER,
+        enableTracing: false,
+        debugLogging: false,
         terminal: {
           clean() {},
           writeLine(message: string) {
@@ -546,65 +407,23 @@ export function MakcuConnectionProvider({ children }: { children: React.ReactNod
         }
       };
 
-      // Run ESPLoader with optional suppression and return loader
-      // Drain any pending bytes from the port before running esptool to avoid stale data responses.
-      // This is critical - firmware responses can interfere with bootloader sync
-      const drainPort = async (port: SerialPort) => {
-        if (!port.readable) return;
-        let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
-        try {
-          reader = port.readable.getReader();
-          const drainTimeout = setTimeout(() => {
-            reader?.cancel().catch(() => {});
-          }, 500); // Increased timeout to drain more thoroughly
-          
-          // Read multiple times to drain all pending data
-          let drainedBytes = 0;
-          for (let i = 0; i < 10; i++) {
-            try {
-              const { value, done } = await Promise.race([
-                reader.read(),
-                new Promise<{ value: Uint8Array | undefined; done: boolean }>((resolve) => 
-                  setTimeout(() => resolve({ value: undefined, done: true }), 50)
-                )
-              ]);
-              if (done || !value) break;
-              drainedBytes += value.length;
-            } catch (e) {
-              break;
-            }
-          }
-          
-          if (drainedBytes > 0) {
-            console.log(`[FLASH MODE] Drained ${drainedBytes} bytes from port before flash mode attempt`);
-          }
-          
-          clearTimeout(drainTimeout);
-        } catch (e) {
-          // ignore
-        } finally {
-          try {
-            await reader?.cancel();
-          } catch (e) {
-            // ignore
-          }
-          try {
-            reader?.releaseLock();
-          } catch (e) {
-            // ignore
-          }
-        }
-      };
-
       const runLoader = async (): Promise<{ transport: Transport; loader: ESPLoader }> => {
         const transport = new Transport(port as any, false, true);
         const loader = new ESPLoader(buildFlashOptions(transport));
         console.log(
-          `[FLASH MODE] esptool connect -> romBaud=${BAUD_RATES.STANDARD}, flashBaud=${BAUD_RATES.FLASH_MODE}, resetMode=no_reset (manual boot mode expected)`
+          `[FLASH MODE] esptool connect -> baud=${BAUD_RATES.ROM_BOOTLOADER}, resetMode=no_reset (download mode expected)`
         );
-        // Device is already in bootloader mode - use no_reset to skip DTR/RTS toggle
-        // esptool will retry on invalid responses internally, so we let it handle retries
-        await loader.main("no_reset");
+        try {
+          // Device is already in bootloader mode; avoid DTR/RTS reset toggles on native USB.
+          await loader.main("no_reset");
+        } catch (error) {
+          try {
+            await transport.disconnect();
+          } catch {
+            // ignore cleanup failures from a failed connect attempt
+          }
+          throw error;
+        }
         return { transport, loader };
       };
 
@@ -618,22 +437,8 @@ export function MakcuConnectionProvider({ children }: { children: React.ReactNod
         // Close once more to guarantee Transport starts from a closed handle
         await safeClosePort(port);
         
-        // Wait for port to fully settle after closing (critical for flash mode)
-        // This gives the device time to reset and enter bootloader mode
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        // Drain any stale data that might have accumulated
-        // Reopen port temporarily to drain, then close again
-        try {
-          await openPortWithBaudRate(port, BAUD_RATES.STANDARD);
-          await drainPort(port);
-          await safeClosePort(port);
-          // Wait again after draining
-          await new Promise(resolve => setTimeout(resolve, 200));
-        } catch (e) {
-          // If drain fails, continue anyway - Transport will handle it
-          console.warn("[FLASH MODE] Port drain failed, continuing:", e);
-        }
+        // Give native USB ports a short settle window without reopening them first.
+        await new Promise(resolve => setTimeout(resolve, 250));
 
         const { transport, loader } = await runLoader();
         return { transport, loader };
@@ -652,33 +457,21 @@ export function MakcuConnectionProvider({ children }: { children: React.ReactNod
         } catch (error) {
           lastError = error;
           
-          if (isReadTimeoutError(error)) {
-            // For read timeouts, suppress toast and simply signal timeout
-            return { readTimeout: true };
-          }
-          
           const errorMsg = error instanceof Error ? error.message : String(error);
-          const isInvalidResponse = errorMsg.includes("invalid response") || 
-                                    errorMsg.includes("r: invalid response");
+          const isInvalidResponse =
+            errorMsg.includes("invalid response") ||
+            errorMsg.includes("r: invalid response");
+          const isSyncTimeout =
+            isReadTimeoutError(error) ||
+            /no serial data received|serial data stream stopped|failed to connect|timed out/i.test(errorMsg);
           
-          if (isInvalidResponse && attempt < maxRetries) {
+          if ((isInvalidResponse || isSyncTimeout) && attempt < maxRetries) {
             // Invalid response but device is in bootloader - retry
             // This can happen if there's stale data or timing issues
-            console.log(`[FLASH MODE] Invalid response on attempt ${attempt}/${maxRetries}, retrying...`);
-            console.log(`[FLASH MODE] Device is in bootloader mode - esptool should sync on retry`);
+            console.log(`[FLASH MODE] Sync failed on attempt ${attempt}/${maxRetries}, retrying...`);
             
             // Wait a bit before retry to let port settle
             await new Promise(resolve => setTimeout(resolve, 500));
-            
-            // Drain port again before retry
-            try {
-              await openPortWithBaudRate(port, BAUD_RATES.STANDARD);
-              await drainPort(port);
-              await safeClosePort(port);
-              await new Promise(resolve => setTimeout(resolve, 200));
-            } catch (e) {
-              // Ignore drain errors, continue with retry
-            }
             
             continue; // Retry
           }
@@ -692,10 +485,13 @@ export function MakcuConnectionProvider({ children }: { children: React.ReactNod
       const errorMsg = lastError instanceof Error ? lastError.message : String(lastError);
       const isInvalidResponse = errorMsg.includes("invalid response") || 
                                 errorMsg.includes("r: invalid response");
+      const isSyncTimeout =
+        isReadTimeoutError(lastError) ||
+        /no serial data received|serial data stream stopped|failed to connect|timed out/i.test(errorMsg);
       
-      if (isInvalidResponse) {
-        console.warn("[FLASH MODE] Connection failed after retries - invalid response persisted");
-        console.warn("[FLASH MODE] Device may not be in bootloader mode, or there's a communication issue");
+      if (isInvalidResponse || isSyncTimeout) {
+        console.warn("[FLASH MODE] Connection failed after retries - bootloader sync did not complete");
+        console.warn("[FLASH MODE] Select the ESP32-S3 native USB port while the device is in download mode");
         console.warn("[FLASH MODE] Error details:", lastError);
       } else {
         // Connection failed - log non-timeout errors
@@ -721,57 +517,6 @@ export function MakcuConnectionProvider({ children }: { children: React.ReactNod
       
       return null;
     }
-  };
-
-  /* ═══════════════════════════════════════════════════════════════════════════
-   * Connection Strategy Functions - Modular helpers for connection flow
-   * ═══════════════════════════════════════════════════════════════════════════ */
-
-  /**
-   * Try connecting with a specific baud rate
-   * Returns success status and baud rate if successful
-   */
-  const tryBaudRate = async (
-    port: SerialPort,
-    baudRate: number
-  ): Promise<{ success: boolean; baudRate?: number }> => {
-      try {
-      await openPortWithBaudRate(port, baudRate);
-      const connectionTimeout = calculateTimeout(baudRate, CONNECTION_TIMEOUTS.MAX_FRAME_BYTES, CONNECTION_TIMEOUTS.SILENCE_SYMBOLS, false);
-      const success = await tryNormalMode(port, baudRate, connectionTimeout, 1);
-      
-      if (success) {
-        return { success: true, baudRate };
-      }
-      
-      await safeClosePort(port);
-      return { success: false };
-      } catch (error) {
-      await safeClosePort(port);
-      return { success: false };
-        }
-  };
-
-  /**
-   * Attempt normal mode connection with multiple baud rates
-   * Tries high-speed first, then standard
-   */
-  const attemptNormalModeConnection = async (
-    port: SerialPort
-  ): Promise<{ success: boolean; baudRate?: number }> => {
-    // Try 4M first (fastest)
-    const highSpeedResult = await tryBaudRate(port, BAUD_RATES.HIGH_SPEED);
-    if (highSpeedResult.success) {
-      return highSpeedResult;
-    }
-
-    // Try standard baud rate (more compatible)
-    const standardResult = await tryBaudRate(port, BAUD_RATES.STANDARD);
-    if (standardResult.success) {
-      return standardResult;
-          }
-
-    return { success: false };
   };
 
   /**
@@ -866,8 +611,10 @@ export function MakcuConnectionProvider({ children }: { children: React.ReactNod
         throw new Error("WebSerial API not supported");
       }
 
-      // Request port from user
-      const selectedPort = await Navigator.serial.requestPort();
+      // Request the actual ESP flash/download port first, not a random control COM port.
+      const selectedPort = await Navigator.serial.requestPort({
+        filters: FLASH_PORT_FILTERS,
+      });
       // Always close once to guarantee a clean handle for flash connect
       await safeClosePort(selectedPort);
       
@@ -1836,4 +1583,3 @@ export function useMakcuConnection() {
   }
   return context;
 }
-

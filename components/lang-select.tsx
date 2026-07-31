@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -9,7 +9,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LanguagesIcon, Check } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { getLocale, getLanguageConfig, getAllLanguageConfigs, type LanguageConfig } from "@/lib/locale";
+import {
+  getLocale,
+  getLanguageConfig,
+  getAllLanguageConfigs,
+  type LanguageConfig,
+} from "@/lib/locale";
 import { useEffect, useState } from "react";
 
 export default function LangSelect() {
@@ -17,66 +22,33 @@ export default function LangSelect() {
   const router = useRouter();
   const [currentLocale, setCurrentLocale] = useState<string>("en");
   const [languages, setLanguages] = useState<LanguageConfig[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const locale = getLocale(pathname);
     setCurrentLocale(locale);
-    
-    // Try to get languages from client-side first (fallback)
-    try {
-      const allLanguages = getAllLanguageConfigs();
-      if (allLanguages.length > 0) {
-        setLanguages(allLanguages);
-        setIsLoading(false);
-      }
-    } catch (error) {
-      // If client-side fails, fetch from API
-      fetch("/api/languages")
-        .then((res) => res.json())
-        .then((data) => {
-          if (Array.isArray(data) && data.length > 0) {
-            setLanguages(data);
-          } else {
-            // Final fallback: use current language only
-            const currentConfig = getLanguageConfig(locale);
-            if (currentConfig) {
-              setLanguages([currentConfig]);
-            }
-          }
-          setIsLoading(false);
-        })
-        .catch((err) => {
-          console.error("Error fetching languages:", err);
-          // Fallback: use current language only
-          const currentConfig = getLanguageConfig(locale);
-          if (currentConfig) {
-            setLanguages([currentConfig]);
-          }
-          setIsLoading(false);
-        });
+
+    const allLanguages = getAllLanguageConfigs();
+    if (allLanguages.length > 0) {
+      setLanguages(allLanguages);
+      return;
     }
+
+    const currentConfig = getLanguageConfig(locale);
+    setLanguages(currentConfig ? [currentConfig] : []);
   }, [pathname]);
 
   function handleChangeLocale(localeCode: string) {
     if (localeCode === currentLocale) return;
-    
-    // Replace the locale in the pathname
+
     const newPathname = pathname.replace(/^\/[a-z]{2}(\/|$)/, `/${localeCode}$1`);
     router.push(newPathname);
   }
 
   const currentConfig = getLanguageConfig(currentLocale);
 
-  // If loading, show loading state
-  if (isLoading || languages.length === 0) {
+  if (languages.length === 0) {
     return (
-      <Button 
-        variant="ghost" 
-        size="icon"
-        disabled={isLoading}
-        title={isLoading ? "Loading languages..." : "No languages available"}
-      >
+      <Button variant="ghost" size="icon" disabled title="No languages available">
         <LanguagesIcon className="h-[1.1rem] w-[1.1rem]" />
       </Button>
     );
@@ -85,8 +57,8 @@ export default function LangSelect() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           size="icon"
           className="relative"
           title={currentConfig ? `Current: ${currentConfig.nativeName}` : "Select language"}

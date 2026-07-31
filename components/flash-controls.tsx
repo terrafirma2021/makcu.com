@@ -16,13 +16,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FlashOptions, FlashModeValues, FlashFreqValues } from "@/esp_tool_fix/lib/index.js";
+import { FlashOptions } from "esptool-js";
 import { Dictionary } from "@/lib/dictionaries";
 import { Locale } from "@/lib/locale";
 import { toast } from "sonner";
-import { Buffer } from "buffer";
 import { useMakcuConnection } from "./contexts/makcu-connection-provider";
 import { Progress } from "@/components/ui/progress";
+import { listMakcuFirmwareFiles } from "@/lib/github-assets";
+import { createSingleImageFlashOptions } from "@/lib/esptool-flash";
 
 interface DataListType {
   name: string;
@@ -76,42 +77,24 @@ export function FlashControls({ lang, dict, onFlashLog }: FlashControlsProps) {
 
   const fetchOnlineDataList = async () => {
     try {
-      const res = await fetch("/api/makcu");
-      if (!res.ok) {
-        const errorText = await res.text().catch(() => `HTTP ${res.status}`);
-        throw new Error(`Network error: ${res.status} ${res.statusText}${errorText ? ` - ${errorText}` : ''}`);
-      }
-      try {
-        const raw: unknown = await res.json();
-        if (!Array.isArray(raw)) {
-          throw new Error("Invalid data format received from server.");
-        }
-        const dataList = (raw as DataListType[]).filter(
-          (item) => !!item.downloadUrl,
-        );
-        dataList.sort((a, b) =>
-          b.name.localeCompare(a.name, undefined, { numeric: true }),
-        );
-        const filesBySide = {} as Record<
-          keyof typeof sideFilters,
-          DataListType[]
-        >;
-        (Object.keys(sideFilters) as (keyof typeof sideFilters)[]).forEach(
-          (side) => {
-            filesBySide[side] = getFilesBySide(dataList, side);
-          },
-        );
-        setLeftFiles(filesBySide.left);
-        setRightFiles(filesBySide.right);
-        setOnlineDataList(dataList);
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Unknown error";
-        handleFlashLog(`Failed to parse online data list: ${errorMessage}`);
-        toast.error(`Failed to parse online data list: ${errorMessage}`);
-        setLeftFiles([]);
-        setRightFiles([]);
-        setOnlineDataList([]);
-      }
+      const dataList = (await listMakcuFirmwareFiles()).filter(
+        (item) => !!item.downloadUrl,
+      );
+      dataList.sort((a, b) =>
+        b.name.localeCompare(a.name, undefined, { numeric: true }),
+      );
+      const filesBySide = {} as Record<
+        keyof typeof sideFilters,
+        DataListType[]
+      >;
+      (Object.keys(sideFilters) as (keyof typeof sideFilters)[]).forEach(
+        (side) => {
+          filesBySide[side] = getFilesBySide(dataList, side);
+        },
+      );
+      setLeftFiles(filesBySide.left);
+      setRightFiles(filesBySide.right);
+      setOnlineDataList(dataList);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       handleFlashLog(
@@ -134,96 +117,18 @@ export function FlashControls({ lang, dict, onFlashLog }: FlashControlsProps) {
     }
   }, [transport, loader]);
 
-  const createFlashOptions = (buffer: ArrayBuffer, firmwareName: string): FlashOptions => {
-    const data = Buffer.from(buffer).toString("binary");
-    
-    // Flash settings will be parsed from image header (required, no fallback)
-    let flashMode: FlashModeValues | undefined;
-    let flashFreq: FlashFreqValues | undefined;
-    
-    // Check first few bytes to see if it looks like a valid firmware
-    const firstBytes = new Uint8Array(buffer.slice(0, 16));
-    
-    // ESP32 firmware typically starts with E9 (magic byte) or has specific patterns
-    const magicByte = firstBytes[0];
-    
-    // Validate firmware format
-    // ESP32 bootloader expects specific magic bytes:
-    // - 0xE9 for ESP32
-    // - 0xEA for ESP32-S2
-    // - 0x20 for ESP32-S3
-    // - 0x18 for ESP32-C3
-    const validMagicBytes = [0xE9, 0xEA, 0x20, 0x18];
+  const createFlashOptions = (buffer: ArrayBuffer): FlashOptions => {
+    const magicByte = new Uint8Array(buffer.slice(0, 1))[0];
+    const validMagicBytes = [0xe9, 0xea, 0x20, 0x18];
     if (!validMagicBytes.includes(magicByte)) {
       handleFlashLog(`Warning: Firmware magic byte (0x${magicByte.toString(16).toUpperCase()}) may be invalid`);
     }
-    
-    // Check if image has proper ESP32 image header format for auto-detection
-    // ESP32 image header structure (from esptool):
-    // Byte 0: Magic byte (0xE9, 0xEA, 0x20, 0x18)
-    // Byte 1: Number of segments
-    // Byte 2-3: Flash mode and size flags (for auto-detection)
-    // ESPLoader uses bytes 2-3 to auto-detect flash settings
-    if (buffer.byteLength >= 4) {
-      const flashModeSize = (firstBytes[2] << 8) | firstBytes[3];
-      
-      // Parse flash settings from image header
-      // Format: flashModeSize is 16-bit where:
-      // - Lower byte (bits 0-7): Flash size (bits 0-2) and frequency (bits 3-4)
-      // - Upper byte (bits 8-15): Flash mode (bits 0-2)
-      if (flashModeSize !== 0 && flashModeSize !== 0xFFFF && flashModeSize !== 0xFF) {
-        // Extract flash mode from upper byte (bits 8-10)
-        const flashModeByte = (flashModeSize >> 8) & 0x07;
-        const flashModeMap: Record<number, FlashModeValues> = {
-          0: 'qio',   // Quad I/O
-          1: 'qout',  // Quad Output
-          2: 'dio',   // Dual I/O
-          3: 'dout',  // Dual Output
-        };
-        const detectedFlashMode = flashModeMap[flashModeByte];
-        
-        // Extract flash frequency from lower byte (bits 3-4)
-        const flashFreqBits = (flashModeSize >> 3) & 0x03;
-        const flashFreqMap: Record<number, FlashFreqValues> = {
-          0: '40m',   // 40MHz
-          1: '26m',   // 26MHz
-          2: '20m',   // 20MHz
-          3: '80m',   // 80MHz
-        };
-        const detectedFlashFreq = flashFreqMap[flashFreqBits];
-        
-        if (detectedFlashMode && detectedFlashFreq) {
-          flashMode = detectedFlashMode;
-          flashFreq = detectedFlashFreq;
-        }
-      }
-    }
-    
-    // Use settings parsed from image header (required, no fallback)
-    if (!flashMode || !flashFreq) {
-      throw new Error(`Flash settings not parsed from image header: mode=${flashMode}, freq=${flashFreq}`);
-    }
-    
-    const finalFlashMode: FlashModeValues = flashMode as FlashModeValues;
-    const finalFlashFreq: FlashFreqValues = flashFreq as FlashFreqValues;
-    
-    return {
-      fileArray: [
-        {
-          data,
-          address: 0x0,
-        },
-      ],
-      eraseAll: false,
-      compress: true,
-      flashMode: finalFlashMode,
-      flashFreq: finalFlashFreq,
-      reportProgress(fileIndex, written, total) {
-        const percent = (written / total) * 100;
-        setProgress(percent);
-        handleFlashLog(`Flashing progress: ${percent.toFixed(1)}%`);
-      },
-    };
+
+    return createSingleImageFlashOptions(buffer, (fileIndex, written, total) => {
+      const percent = (written / total) * 100;
+      setProgress(percent);
+      handleFlashLog(`Flashing progress: ${percent.toFixed(1)}%`);
+    });
   };
 
   const executeFlash = async (
@@ -233,7 +138,7 @@ export function FlashControls({ lang, dict, onFlashLog }: FlashControlsProps) {
     if (!loader) {
       return;
     }
-    
+
     // Check if device is in normal mode
     if (status === "connected" && mode === "normal") {
       toast.error(dict?.device_control.warnings.normal_mode_detected || "Cannot flash in normal mode. Please disconnect and reconnect in flash mode.");
@@ -251,13 +156,13 @@ export function FlashControls({ lang, dict, onFlashLog }: FlashControlsProps) {
       console.log(
         `[FLASH MODE] writeFlash plan -> files=${flashOptions.fileArray.length} ${filesSummary} ` +
         `flashMode=${flashOptions.flashMode ?? "default"} flashFreq=${flashOptions.flashFreq ?? "default"} ` +
-        `eraseAll=${!!flashOptions.eraseAll} compress=${!!flashOptions.compress}`
+        `flashSize=${flashOptions.flashSize ?? "default"} eraseAll=${!!flashOptions.eraseAll} compress=${!!flashOptions.compress}`
       );
-      
+
       await loader.writeFlash(flashOptions);
-      
+
       await loader.after();
-      
+
       handleFlashLog("Flash complete");
       handleFlashLog(`Flashed ${firmwareName}`);
       toast.success(dict?.tools.flashSuccess || "Flash successful!");
@@ -279,10 +184,10 @@ export function FlashControls({ lang, dict, onFlashLog }: FlashControlsProps) {
   const flashDevice = async (file: File) => {
     try {
       handleFlashLog(`Reading file: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`);
-      
+
       const buffer = await file.arrayBuffer();
-      
-      const flashOptions = createFlashOptions(buffer, file.name);
+
+      const flashOptions = createFlashOptions(buffer);
       await executeFlash(flashOptions, file.name);
     } catch (error) {
       const errorMsg = `Error reading file: ${error}`;
@@ -310,23 +215,23 @@ export function FlashControls({ lang, dict, onFlashLog }: FlashControlsProps) {
           "Warning: selected firmware URL may not be a raw.githubusercontent.com resource";
         handleFlashLog(warnMsg);
       }
-      
+
       handleFlashLog(`Downloading ${selected.name}...`);
-      
+
       const response = await fetch(selected.downloadUrl);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const buffer = await response.arrayBuffer();
-      
+
       // Check if downloaded size matches expected size
       if (selected.size > 0 && buffer.byteLength !== selected.size) {
         handleFlashLog(`Warning: File size mismatch (expected ${selected.size}, got ${buffer.byteLength})`);
       }
 
       handleFlashLog("Download complete, starting flash...");
-      const flashOptions = createFlashOptions(buffer, selected.name);
+      const flashOptions = createFlashOptions(buffer);
       await executeFlash(flashOptions, selected.name);
     } catch (error) {
       const errorMsg = `Error downloading firmware: ${error}`;
@@ -488,4 +393,3 @@ export function FlashControls({ lang, dict, onFlashLog }: FlashControlsProps) {
     </div>
   );
 }
-

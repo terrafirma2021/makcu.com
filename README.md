@@ -1,55 +1,54 @@
-# Makcu Project
+# Makcu Website
 
-## Project Introduction
+Official MAKCU documentation and browser tools site built with Next.js and exported as a static site for GitHub Pages.
 
-This project is the official website of makcu, developed using the React framework, and is mainly used to display makcu's documents/online tools/related information, etc.
+## Requirements
 
-## Environmental Requirements
-- Node.js Version: [22.x.x]
+- Node.js 24.x
+- pnpm 11.x via Corepack
 
-## Installation
-
-First, clone the repository:
+## Setup
 
 ```bash
 git clone https://github.com/MakcuTeam/Website project-name
 cd project-name
-
-# Initialize submodules if needed
 git submodule sync
 git submodule update --init --recursive
-```
-
-Install dependencies:
-
-```bash
+corepack enable
+corepack prepare pnpm@11.18.0 --activate
 pnpm install
 ```
 
-## Usage
-
-### Development mode
+## Development
 
 ```bash
 pnpm dev
 ```
 
-### Build a production version
+For HTTPS Web Serial testing:
+
+```bash
+pnpm dev-ssl
+```
+
+## Static Build
 
 ```bash
 pnpm build
 ```
 
-### Run tests
+The static site is written to `out/`.
+
+Preview the exported site locally:
 
 ```bash
 pnpm start
 ```
 
-## Environment Variables
+## GitHub Pages Deployment
 
-The API routes that list firmware files query the GitHub API. If you exceed the
-unauthenticated rate limit (60 requests per hour), set `GITHUB_TOKEN` to a
-personal access token to increase the limit. 
+Deployment is handled by `.github/workflows/pages.yml` on pushes to `makcu.com` and manual workflow runs.
 
-<!-- CI test trigger change -->
+In the repository settings, set Pages source to **GitHub Actions**. For a custom domain such as `www.makcu.com`, configure the domain in GitHub Pages settings and leave `NEXT_PUBLIC_BASE_PATH` unset. For project Pages without a custom domain, set the repository variable `NEXT_PUBLIC_BASE_PATH` to `/<repo-name>`.
+
+The firmware list is loaded directly from the public GitHub contents API in the browser because GitHub Pages does not run server API routes.
