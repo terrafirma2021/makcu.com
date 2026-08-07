@@ -14,33 +14,37 @@ import { DeviceInfoDisplay } from "./device-info-display";
 
 export function Navbar({ dict }: { dict: Dictionary }) {
   return (
-    <nav className="w-full border-b h-16 sticky top-0 z-50  backdrop-blur bg-black/10">
-      <div className="w-full h-full flex items-center justify-between px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-5">
+    <nav className="makcu-navbar">
+      <div className="makcu-navbar-inner">
+        <div className="makcu-navbar-leading">
           <SheetLeftbar dict={dict} />
-          <div className="flex items-center gap-6">
-            <div className="sm:flex hidden">
+          <div className="makcu-navbar-brand-group">
+            <div className="makcu-desktop-logo">
               <Logo />
             </div>
-            <div className="lg:flex hidden items-center gap-4 text-sm font-medium text-muted-foreground">
+            <div className="makcu-primary-nav">
               <NavMenu dict={dict} />
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 ml-auto">
-          <div className="hidden md:block">
+        <div className="makcu-navbar-actions">
+          <div className="makcu-navbar-search">
             <SearchBar />
           </div>
-          <DeviceInfoDisplay />
-          <div className="flex items-center gap-2">
-            <div className="flex ml-2.5 sm:ml-0">
+          <div className="makcu-navbar-device-info">
+            <DeviceInfoDisplay />
+          </div>
+          <div className="makcu-navbar-tools">
+            <div className="makcu-navbar-toggles">
               <LangSelect />
               <ModeToggle dict={dict} />
             </div>
           </div>
           <MakcuConnectionButton dict={dict} />
-          <AudioToggle />
+          <div className="makcu-navbar-audio">
+            <AudioToggle />
+          </div>
         </div>
       </div>
     </nav>
@@ -49,8 +53,11 @@ export function Navbar({ dict }: { dict: Dictionary }) {
 
 export function Logo() {
   return (
-    <LocalizedLink href="/" className="flex items-center gap-2.5">
-      <h2 className="text-3xl font-bold font-logo tracking-[5px] text-black dark:text-white">Makcu</h2>
+    <LocalizedLink href="/" className="makcu-brand" aria-label="MAKCU home">
+      <span className="makcu-brand-word" aria-hidden="true">
+        <span>MAK</span><strong>CU</strong>
+      </span>
+      <span className="makcu-brand-signature">INPUT SYSTEMS</span>
     </LocalizedLink>
   );
 }
@@ -99,8 +106,8 @@ export function NavMenu({
         const Comp = (
           <LocalizedLink
             key={item.title + item.href}
-            className="flex items-center gap-1 text-black dark:text-white"
-            activeClassName={item.href ? "text-black dark:text-white font-extrabold" : ""}
+            className="makcu-nav-link"
+            activeClassName={item.href ? "makcu-nav-link-active" : ""}
             href={item.href ?? ""}
             target={item.target}
           >

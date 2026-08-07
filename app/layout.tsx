@@ -1,15 +1,7 @@
 ﻿import type { Metadata } from "next";
 import { Space_Grotesk, Space_Mono, Noto_Serif_SC } from "next/font/google";
-import localFont from "next/font/local";
-import { BackgroundVideo } from "@/components/background-video";
+import { MakcuBackdrop } from "@/components/makcu-backdrop";
 import "@/styles/globals.css";
-
-const roadRage = localFont({
-  src: "../fonts/Road-Rage.otf",
-  display: "swap",
-  variable: "--font-logo",
-  weight: "400",
-});
 
 const sansFont = Space_Grotesk({
   subsets: ["latin"],
@@ -44,11 +36,11 @@ export default function AppLayout({
   return (
     <html lang="en" suppressHydrationWarning style={{ overflowX: "hidden" }}>
       <body
-        className={`${sansFont.variable} ${notoSerif.variable} ${monoFont.variable} ${roadRage.variable} font-basic antialiased tracking-wide relative`}
+        className={`${sansFont.variable} ${notoSerif.variable} ${monoFont.variable} font-basic antialiased tracking-wide relative`}
         suppressHydrationWarning
         style={{ position: "relative", overflowX: "hidden" }}
       >
-        <BackgroundVideo />
+        <MakcuBackdrop />
         <div style={{ position: "relative", zIndex: 1 }}>{children}</div>
       </body>
     </html>
