@@ -82,6 +82,7 @@
     overflow-x: hidden;
     background: var(--makcu-bg);
     color: var(--makcu-text);
+    font-size: 14px;
   }
 
   ::selection {
@@ -464,7 +465,7 @@ select:focus,
   max-width: 650px;
   margin: 25px 0 20px;
   color: var(--makcu-text);
-  font-size: clamp(50px, 5.7vw, 90px);
+  font-size: clamp(34px, 4vw, 54px);
   font-weight: 760;
   letter-spacing: -0.065em;
   line-height: 0.92;
@@ -475,7 +476,7 @@ select:focus,
   max-width: 570px;
   margin: 0;
   color: var(--makcu-muted);
-  font-size: clamp(15px, 1.3vw, 19px);
+  font-size: clamp(13px, 1vw, 16px);
   line-height: 1.65;
 }
 
@@ -678,7 +679,7 @@ select:focus,
 .makcu-section-heading h2 {
   margin: 3px 0 0;
   color: var(--makcu-text);
-  font-size: clamp(25px, 3vw, 39px);
+  font-size: clamp(22px, 2.4vw, 32px);
   font-weight: 680;
   letter-spacing: -0.04em;
 }
@@ -734,7 +735,7 @@ select:focus,
 .makcu-proof-card-body strong {
   color: var(--makcu-text);
   font-family: var(--font-geist-mono), monospace;
-  font-size: 27px;
+  font-size: 22px;
   font-weight: 500;
 }
 
@@ -820,7 +821,7 @@ select:focus,
 
 .makcu-main-shell > div.flex.flex-col > header h1 {
   color: var(--makcu-text) !important;
-  font-size: clamp(38px, 5vw, 66px);
+  font-size: clamp(30px, 3.5vw, 48px);
   font-weight: 700;
   letter-spacing: -0.055em;
   line-height: 0.98;
@@ -860,6 +861,14 @@ select:focus,
 .makcu-content-subsection h3 {
   color: var(--makcu-text) !important;
   letter-spacing: -0.035em;
+}
+
+.makcu-content-heading h2 {
+  font-size: clamp(22px, 2.2vw, 30px);
+}
+
+.makcu-content-subsection h3 {
+  font-size: clamp(17px, 1.7vw, 21px);
 }
 
 .makcu-content-section .makcu-card {
@@ -978,7 +987,7 @@ img { user-select: none; -webkit-user-drag: none; }
   .makcu-home { gap: 42px; padding-top: 14px; }
   .makcu-hero { grid-template-columns: minmax(0, 1fr); }
   .makcu-hero-copy { padding: 42px 28px 20px; }
-  .makcu-hero h1 { font-size: clamp(48px, 12vw, 72px); }
+  .makcu-hero h1 { font-size: clamp(32px, 9vw, 46px); }
   .makcu-device-stage { min-height: 390px; padding: 30px 24px 72px; }
   .makcu-device-halo { width: min(84vw, 440px); }
   .makcu-device-index { top: 18px; right: 22px; }
@@ -998,7 +1007,7 @@ img { user-select: none; -webkit-user-drag: none; }
   .makcu-navbar-actions { min-width: 0; }
   .makcu-hero-copy { padding: 36px 20px 18px; }
   .makcu-kicker { font-size: 9px; letter-spacing: 0.1em; }
-  .makcu-hero h1 { margin-top: 20px; font-size: 47px; }
+  .makcu-hero h1 { margin-top: 20px; font-size: 38px; }
   .makcu-hero-actions { display: grid; width: 100%; }
   .makcu-hero-primary,
   .makcu-hero-secondary { width: 100%; }
