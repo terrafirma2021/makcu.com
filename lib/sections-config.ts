@@ -1,5 +1,3 @@
-import type { Locale } from "./locale";
-
 export type SectionItem = {
   id: string;
   labelKey: string; // Translation key for the label

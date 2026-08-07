@@ -9,25 +9,6 @@ import { FirmwareSelectionSection } from "@/components/firmware-selection-sectio
 import { DeviceTestSection } from "@/components/device-test-section";
 import { DeviceControlNote } from "@/components/device-control-note";
 
-type TocItem = {
-  id: string;
-  label: string;
-  children?: TocItem[];
-};
-
-const tocByLang: Record<Locale, TocItem[]> = {
-  en: [
-    { id: "device-test", label: "Device Test" },
-    { id: "firmware-selection", label: "Firmware Selection" },
-    { id: "serial-terminal", label: "Serial Terminal" },
-  ],
-  cn: [
-    { id: "device-test", label: "设备测试" },
-    { id: "firmware-selection", label: "固件选择" },
-    { id: "serial-terminal", label: "串口终端" },
-  ],
-};
-
 const metadataCopy: Record<Locale, { title: string; description: string }> = {
   en: {
     title: "MAKCU Device Control — Device Configuration",
@@ -55,8 +36,6 @@ export async function generateMetadata({ params }: LangProps): Promise<Metadata>
 export default async function DeviceControlPage({ params }: LangProps) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
-  const isCn = lang === "cn";
-  const toc = tocByLang[lang];
 
   return (
     <div className="flex flex-col">

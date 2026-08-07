@@ -1,12 +1,12 @@
 import { useEffect, useRef, RefObject } from 'react';
 
 type ScrollToBottomOptions = {
-    dependency?: any[];
+    dependency?: unknown;
     smooth?: boolean;
 };
 
 export function useScrollToBottom<T extends HTMLElement>(options: ScrollToBottomOptions = {}): RefObject<T | null> {
-    const { dependency = [], smooth = false } = options;
+    const { dependency, smooth = false } = options;
     const ref = useRef<T>(null);
 
     useEffect(() => {
@@ -20,7 +20,7 @@ export function useScrollToBottom<T extends HTMLElement>(options: ScrollToBottom
                 ref.current.scrollTop = ref.current.scrollHeight;
             }
         }
-    }, [ref, ...dependency, smooth]);
+    }, [dependency, smooth]);
 
     return ref;
 }

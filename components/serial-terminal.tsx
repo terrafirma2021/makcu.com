@@ -57,7 +57,7 @@ export function SerialTerminal({ lang }: SerialTerminalProps) {
       let hexBytes = "";
       try {
         textData = new TextDecoder("utf-8", { fatal: false }).decode(value);
-      } catch (e) {
+      } catch {
         textData = `[Binary: ${value.length} bytes]`;
       }
 

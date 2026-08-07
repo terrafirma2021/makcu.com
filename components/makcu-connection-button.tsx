@@ -3,13 +3,10 @@
 import { Button } from "./ui/button";
 import { useMakcuConnection } from "./contexts/makcu-connection-provider";
 import { Dictionary } from "@/lib/dictionaries";
-import useLocale from "./hooks/useLocale";
 import { Plug, PlugZap, AlertCircle } from "lucide-react";
 
 export function MakcuConnectionButton({ dict }: { dict: Dictionary }) {
   const { status, mode, connect, disconnect, isConnecting, browserSupported, detectedBaudRate } = useMakcuConnection();
-  const locale = useLocale();
-  const isCn = locale === "cn";
 
   const getStatusText = () => {
     if (status === "disconnected") {

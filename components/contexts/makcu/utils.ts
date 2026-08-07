@@ -1,4 +1,4 @@
-import { CONNECTION_TIMEOUTS, SERIAL_PORT_CONFIG, BAUD_RATES } from "./constants";
+import { CONNECTION_TIMEOUTS, SERIAL_PORT_CONFIG } from "./constants";
 
 /**
  * Calculate timeout based on 8N1 symbol periods (like firmware UART hardware timeout)
@@ -79,7 +79,7 @@ export async function safeClosePort(port: SerialPort): Promise<void> {
         const reader = port.readable.getReader();
         await reader.cancel().catch(() => {});
         reader.releaseLock();
-      } catch (e) {
+      } catch {
         // Ignore lock release errors
       }
     }
@@ -89,7 +89,7 @@ export async function safeClosePort(port: SerialPort): Promise<void> {
       try {
         const writer = port.writable.getWriter();
         writer.releaseLock();
-      } catch (e) {
+      } catch {
         // Ignore lock release errors
       }
     }
@@ -100,7 +100,7 @@ export async function safeClosePort(port: SerialPort): Promise<void> {
       // Small delay to let OS release the port
       await new Promise(resolve => setTimeout(resolve, 100));
     }
-  } catch (e) {
+  } catch {
     // Ignore close errors - port might already be closed
   }
 }
@@ -109,7 +109,8 @@ export async function safeClosePort(port: SerialPort): Promise<void> {
  * Get COM port name (if available)
  * Note: WebSerial API doesn't expose COM port numbers for security/privacy reasons
  */
-export function getComPort(_port: SerialPort): string | null {
+export function getComPort(port: SerialPort): string | null {
+  void port;
   // WebSerial API specification doesn't provide COM port information
   // The port selection dialog shows the device name, but not the COM port number
   // This is by design for security and privacy reasons

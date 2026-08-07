@@ -1,12 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 import type { Locale } from "@/lib/locale";
 import type { SectionItem } from "@/lib/sections-config";
 import { Dictionary } from "@/lib/dictionaries";
-import { ChevronRight } from "lucide-react";
 import { DeviceInformationDisplay } from "./device-information-display";
 import { useMakcuConnection } from "./contexts/makcu-connection-provider";
 
@@ -86,58 +84,6 @@ export default function PageSidebar({
     
     return value;
   };
-
-  const [hoveredSection, setHoveredSection] = useState<string | null>(null);
-
-  const renderSection = (section: SectionItem, level: number = 0) => {
-    const label = getLabel(section.labelKey);
-    const href = `/${lang}${currentPage}#${section.id}`;
-    const hasChildren = section.children && section.children.length > 0;
-    const isHovered = hoveredSection === section.id;
-
-    return (
-      <div
-        key={section.id}
-        className={level > 0 ? "mt-2" : ""}
-        onMouseEnter={() => hasChildren && setHoveredSection(section.id)}
-        onMouseLeave={() => setHoveredSection(null)}
-      >
-        <Link
-          href={href}
-          className={`flex items-center gap-1.5 transition hover:text-black dark:hover:text-white ${
-            level === 0
-              ? "font-medium text-black dark:text-white text-sm"
-              : "text-xs text-muted-foreground"
-          }`}
-        >
-          {hasChildren && (
-            <ChevronRight
-              className={`h-3 w-3 transition-transform ${
-                isHovered ? "rotate-90" : ""
-              }`}
-            />
-          )}
-          <span>{label}</span>
-        </Link>
-        {hasChildren && isHovered && section.children && (
-          <ul className="space-y-1.5 border-l border-border/60 pl-4 mt-2 ml-1.5">
-            {section.children.map((child) => (
-              <li key={child.id}>
-                <Link
-                  href={`/${lang}${currentPage}#${child.id}`}
-                  className="block text-xs text-muted-foreground transition hover:text-black dark:hover:text-white py-1"
-                >
-                  {getLabel(child.labelKey)}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    );
-  };
-
-  const isCn = lang === "cn";
 
   return (
     <aside>

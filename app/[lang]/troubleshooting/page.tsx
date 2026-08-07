@@ -2,7 +2,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import type { LangProps } from "@/lib/dictionaries";
 import type { Locale } from "@/lib/locale";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { getDictionary } from "@/lib/dictionaries";
 import PageSidebar from "@/components/page-sidebar";
 import { getSectionsForPage } from "@/lib/sections-config";

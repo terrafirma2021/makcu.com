@@ -9,7 +9,6 @@ export function AudioPlayer() {
   const isInitialized = useRef(false);
   const interactionHandled = useRef(false);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
 
   // Initialize Web Audio API with GainNode for precise volume control
   useEffect(() => {
@@ -91,7 +90,7 @@ export function AudioPlayer() {
       audio.removeEventListener("volumechange", handleVolumeChange);
       audio.removeEventListener("canplaythrough", handleCanPlayThrough);
     };
-  }, [audioRef, setIsMuted]);
+  }, [audioRef, gainNodeRef, setIsMuted]);
 
   // Handle user interaction - MUST be synchronous for Chrome!
   useEffect(() => {

@@ -33,10 +33,7 @@ export async function generateMetadata({ params }: LangProps): Promise<Metadata>
 export default async function XimPage({ params }: LangProps) {
   const { lang } = await params;
   const dict = await getDictionary(lang);
-  const isCn = lang === "cn";
   const sections = getSectionsForPage("xim");
-
-  const t = (en: string, cn: string) => (isCn ? cn : en);
 
   return (
     <div className="flex flex-col">

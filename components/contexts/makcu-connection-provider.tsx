@@ -13,21 +13,13 @@ import {
   type BinaryFrameSubscriber,
   type TextLogSubscriber,
   type MakcuConnectionContextType,
-  type ConnectionMode,
-  type ConnectionStatus,
-  type TestStatus,
-  type MouseTestResults,
-  type KeyboardTestResults,
-  type DeviceTestResult,
   // Constants
   UART0_START_BYTE,
   UART0_CMD_STATUS,
   UART0_CMD_GET_MAC1,
   UART0_CMD_GET_MAC2,
   UART0_CMD_GET_TEMP,
-  UART0_CMD_GET_RAM,
   UART0_CMD_GET_CPU,
-  UART0_CMD_GET_UPTIME,
   UART0_CMD_GET_VID,
   UART0_CMD_GET_PID,
   UART0_CMD_GET_MOUSE_BINT,
@@ -41,9 +33,7 @@ import {
   UART0_CMD_GET_SPOOF_ACTIVE,
   UART0_CMD_GET_SCREEN_W,
   UART0_CMD_GET_SCREEN_H,
-  UART0_CMD_GET_FAULT,
   BAUD_RATES,
-  SERIAL_PORT_CONFIG,
   CONNECTION_TIMEOUTS,
   DEVICE_INFO_COOKIE,
   DEVICE_INFO_EXPIRY_HOURS,
@@ -52,16 +42,12 @@ import {
   parseBinaryFrame,
   // Parsers
   parseStatusResponse,
-  parseDeviceTestResponse,
   routeApiCommand,
-  registerApiCommandParser,
   // Utils
   calculateTimeout,
   safeClosePort,
   getComPort,
   setCookie,
-  getCookie,
-  deleteCookie,
 } from "./makcu";
 
 // Protocol functions (binary framing/parsing) now in makcu/protocol.ts
@@ -164,7 +150,7 @@ export function getDeviceInfo(): Record<string, any> {
         const cookieData = JSON.parse(cookieValue);
         // Merge cookie data with defaults (cookie data takes precedence)
         return { ...defaultInfo, ...cookieData };
-      } catch (e) {
+      } catch {
         // If cookie parse fails, return defaults
         return defaultInfo;
       }
@@ -297,12 +283,12 @@ export function MakcuConnectionProvider({ children }: { children: React.ReactNod
     if (readerRef.current) {
       try {
         await readerRef.current.cancel();
-      } catch (e) {
+      } catch {
         // Ignore
       }
       try {
         readerRef.current.releaseLock();
-      } catch (e) {
+      } catch {
         // Ignore
       }
       readerRef.current = null;
@@ -310,7 +296,7 @@ export function MakcuConnectionProvider({ children }: { children: React.ReactNod
     if (writerRef.current) {
       try {
         writerRef.current.releaseLock();
-      } catch (e) {
+      } catch {
         // Ignore
       }
       writerRef.current = null;
@@ -383,7 +369,7 @@ export function MakcuConnectionProvider({ children }: { children: React.ReactNod
               const reader = port.readable.getReader();
               await reader.cancel().catch(() => {});
               reader.releaseLock();
-            } catch (e) {
+            } catch {
               // ignore
             }
           }
@@ -391,18 +377,18 @@ export function MakcuConnectionProvider({ children }: { children: React.ReactNod
             try {
               const writer = port.writable.getWriter();
               writer.releaseLock();
-            } catch (e) {
+            } catch {
               // ignore
             }
           }
           if (port.readable || port.writable) {
             try {
               await port.close();
-            } catch (e) {
+            } catch {
               // ignore
             }
           }
-        } catch (e) {
+        } catch {
           // ignore
         }
       };
@@ -595,7 +581,7 @@ export function MakcuConnectionProvider({ children }: { children: React.ReactNod
   };
 
 
-  const connect = useCallback(async () => {
+  const connect = async () => {
     // Early returns for invalid states
     if (isConnecting || state.status === "connected") {
       return;
@@ -641,7 +627,7 @@ export function MakcuConnectionProvider({ children }: { children: React.ReactNod
     } finally {
       setIsConnecting(false);
     }
-  }, [isConnecting, state.status, cleanup]);
+  };
 
   // Internal disconnect function that uses stateRef to avoid stale closures
   const performDisconnect = useCallback(async () => {
@@ -654,7 +640,7 @@ export function MakcuConnectionProvider({ children }: { children: React.ReactNod
     if (currentState.loader) {
       try {
         await currentState.loader.after();
-      } catch (e) {
+      } catch {
         // Ignore
       }
     }
@@ -702,7 +688,7 @@ export function MakcuConnectionProvider({ children }: { children: React.ReactNod
     const Navigator = navigator as Navigator & { serial?: Serial };
     if (!Navigator.serial) return;
 
-    const handleDisconnect = async (event: Event) => {
+    const handleDisconnect = async () => {
       // Use stateRef to get the latest state
       const currentState = stateRef.current;
       // Check if we have an active connection
@@ -801,7 +787,7 @@ export function MakcuConnectionProvider({ children }: { children: React.ReactNod
               try {
                 const textData = new TextDecoder("utf-8", { fatal: false }).decode(value);
                 console.log(`[CONTINUOUS READER] RX (text):`, textData.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\0/g, "\\0"));
-              } catch (e) {
+              } catch {
                 console.log(`[CONTINUOUS READER] RX: Binary data (not text)`);
               }
 
@@ -815,8 +801,6 @@ export function MakcuConnectionProvider({ children }: { children: React.ReactNod
               binaryFrameBufferRef.current = new Uint8Array(0);
               
               let processedPos = 0;
-              let hasIncompleteFrame = false;
-              
               // Process data sequentially from start (don't search randomly for 0x50)
               while (processedPos < combined.length) {
                 // Check if current position starts with 0x50 (binary frame start)
@@ -825,7 +809,6 @@ export function MakcuConnectionProvider({ children }: { children: React.ReactNod
                   if (processedPos + 4 > combined.length) {
                     // Not enough data for header - buffer and wait
                     binaryFrameBufferRef.current = combined.slice(processedPos);
-                    hasIncompleteFrame = true;
                     break;
                   }
                   
@@ -868,7 +851,6 @@ export function MakcuConnectionProvider({ children }: { children: React.ReactNod
                   if (processedPos + totalFrameLen > combined.length) {
                     // Incomplete frame - buffer and wait for more data
                     binaryFrameBufferRef.current = combined.slice(processedPos);
-                    hasIncompleteFrame = true;
                     break;
                   }
                   
@@ -973,7 +955,7 @@ export function MakcuConnectionProvider({ children }: { children: React.ReactNod
               // Port is no longer accessible - use main disconnect function
               await performDisconnect();
             }
-          } catch (error) {
+          } catch {
             // Port is likely disconnected - use main disconnect function
             await performDisconnect();
           }
@@ -1389,7 +1371,7 @@ export function MakcuConnectionProvider({ children }: { children: React.ReactNod
           }
 
           return null;
-        } catch (error) {
+        } catch {
           return null;
         }
       })();
@@ -1458,6 +1440,7 @@ export function MakcuConnectionProvider({ children }: { children: React.ReactNod
     timeoutMs?: number,
     _maxRetries?: number
   ): Promise<Uint8Array | null> => {
+    void _maxRetries;
     const currentState = stateRef.current;
     if (currentState.status !== "connected" || !currentState.port) {
       console.log(`[BINARY API] Not connected`);
@@ -1538,7 +1521,7 @@ export function MakcuConnectionProvider({ children }: { children: React.ReactNod
     
     console.warn(`[BINARY API] Command 0x${cmd.toString(16).toUpperCase()} failed (single attempt, CRC removed)`);
     return null;
-  }, [cleanup, subscribeToBinaryFrames]);
+  }, [subscribeToBinaryFrames]);
 
   // Store sendBinaryCommand in ref so fetchFullDeviceInfo can access it
   useEffect(() => {

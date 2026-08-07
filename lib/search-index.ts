@@ -1,6 +1,5 @@
 import { SECTIONS_CONFIG, type SectionItem } from "./sections-config";
 import type { Dictionary } from "./dictionaries";
-import type { Locale } from "./locale";
 
 export type SearchResult = {
   id: string;
@@ -51,7 +50,7 @@ function extractAllStrings(obj: any, results: Set<string> = new Set()): Set<stri
 /**
  * Builds a searchable index from the centralized sections config.
  */
-export function buildSearchIndex(dict: Dictionary, lang: Locale): SearchResult[] {
+export function buildSearchIndex(dict: Dictionary): SearchResult[] {
   const results: SearchResult[] = [];
 
   const getLabel = (labelKey: string): string => {
@@ -128,12 +127,11 @@ export function buildSearchIndex(dict: Dictionary, lang: Locale): SearchResult[]
 export function searchIndex(
   query: string,
   dict: Dictionary,
-  lang: Locale,
   maxResults: number = 10
 ): SearchResult[] {
   if (!query.trim()) return [];
 
-  const index = buildSearchIndex(dict, lang);
+  const index = buildSearchIndex(dict);
   const lowerQuery = query.toLowerCase().trim();
   
   // Extract all searchable strings from dictionary

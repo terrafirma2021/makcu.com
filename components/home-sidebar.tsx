@@ -18,7 +18,6 @@ type HomeSidebarProps = {
  */
 export default function HomeSidebar({ lang, dict }: HomeSidebarProps) {
   const allPages = getAllSections();
-  const isCn = lang === "cn";
 
   const getLabel = (labelKey: string): string => {
     // Navigate through the dictionary using the key path

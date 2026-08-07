@@ -30,7 +30,7 @@ export default function SearchBar() {
 
   useEffect(() => {
     if (query.trim()) {
-      const searchResults = searchIndex(query, dict, lang, 8);
+      const searchResults = searchIndex(query, dict, 8);
       setResults(searchResults);
       setIsOpen(true);
       setSelectedIndex(0);

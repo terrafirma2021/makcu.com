@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -51,7 +51,7 @@ export const getFilesBySide = (
 
 export const DeviceTool: React.FC<{ lang: Locale; dict: Dictionary }> = ({ lang, dict }) => {
   const debugRef = useRef<DebugWindowRef | null>(null);
-  const handleAddInfo = (info: string) => {
+  const handleAddInfo = useCallback((info: string) => {
     const suppressedDiagnostics = [
       "Image file at 0x0 doesn't look like an image file, so not changing any flash settings.",
       "Running stub...",
@@ -61,13 +61,13 @@ export const DeviceTool: React.FC<{ lang: Locale; dict: Dictionary }> = ({ lang,
       return;
     }
     debugRef.current?.addInfo(info);
-  };
+  }, []);
 
   const [onlineDataList, setOnlineDataList] = useState<DataListType[]>([]);
   const [leftFiles, setLeftFiles] = useState<DataListType[]>([]);
   const [rightFiles, setRightFiles] = useState<DataListType[]>([]);
 
-  const fetchOnlineDataList = async () => {
+  const fetchOnlineDataList = useCallback(async () => {
     try {
       const dataList = (await listMakcuFirmwareFiles()).filter(
         (item) => !!item.downloadUrl,
@@ -97,7 +97,7 @@ export const DeviceTool: React.FC<{ lang: Locale; dict: Dictionary }> = ({ lang,
       setRightFiles([]);
       setOnlineDataList([]);
     }
-  };
+  }, [handleAddInfo]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -105,7 +105,7 @@ export const DeviceTool: React.FC<{ lang: Locale; dict: Dictionary }> = ({ lang,
     };
 
     fetchData();
-  }, []);
+  }, [fetchOnlineDataList]);
 
   const [config, setConfig] = useState<{ mode: "online" | "offline" }>({
     mode: "online",

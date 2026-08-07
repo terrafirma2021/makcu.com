@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -69,13 +69,13 @@ export function FlashControls({ lang, dict, onFlashLog }: FlashControlsProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const isCn = lang === "cn";
 
-  const handleFlashLog = (message: string) => {
+  const handleFlashLog = useCallback((message: string) => {
     if (onFlashLog) {
       onFlashLog(message);
     }
-  };
+  }, [onFlashLog]);
 
-  const fetchOnlineDataList = async () => {
+  const fetchOnlineDataList = useCallback(async () => {
     try {
       const dataList = (await listMakcuFirmwareFiles()).filter(
         (item) => !!item.downloadUrl,
@@ -105,11 +105,11 @@ export function FlashControls({ lang, dict, onFlashLog }: FlashControlsProps) {
       setRightFiles([]);
       setOnlineDataList([]);
     }
-  };
+  }, [handleFlashLog]);
 
   useEffect(() => {
     fetchOnlineDataList();
-  }, []);
+  }, [fetchOnlineDataList]);
 
   useEffect(() => {
     if (!transport || !loader) {

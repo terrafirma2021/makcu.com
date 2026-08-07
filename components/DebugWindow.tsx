@@ -28,7 +28,7 @@ export const DebugWindow = forwardRef<
   }));
 
   const chatContainerRef = useScrollToBottom<HTMLDivElement>({
-    dependency: [info],
+    dependency: info,
     smooth: true,
   });
 

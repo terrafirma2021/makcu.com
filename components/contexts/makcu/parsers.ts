@@ -1,4 +1,4 @@
-import type { MakcuStatus, TestStatus, DeviceTestResult, MouseTestResults, KeyboardTestResults } from "./types";
+import type { MakcuStatus, TestStatus, DeviceTestResult } from "./types";
 import * as constants from "./constants";
 
 /**
