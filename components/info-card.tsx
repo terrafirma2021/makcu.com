@@ -11,14 +11,14 @@ export type InfoCardProps = {
 };
 export const InfoCard: React.FC<InfoCardProps> = (props) => {
   return (
-    <Card className="bg-transparent backdrop-blur-sm">
-      <div className="flex justify-between p-3">
-        {props.Icon && <props.Icon />}
+    <Card className="makcu-proof-card">
+      <div className="makcu-proof-card-header">
+        {props.Icon && <span><props.Icon /></span>}
         {props.title && <div>{props.title}</div>}
       </div>
-      <div className=" flex flex-col p-3 text-left gap-2">
-        <span className="text-xl">{props.number}</span>
-        <ul className="pt-2 text-sm space-y-1">
+      <div className="makcu-proof-card-body">
+        <strong>{props.number}</strong>
+        <ul>
           {props.description.map((line, index) => (
             <li key={index}>{line}</li>
           ))}

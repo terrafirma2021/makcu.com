@@ -63,7 +63,6 @@ const config = {
       fontFamily: {
         code: ["var(--font-geist-mono)"],
         regular: ["var(--font-geist-sans)"],
-        logo: ["var(--font-logo)"],
         noto: ["var(--font-noto-sc)"],
         basic: ["var(--font-geist-sans)", "var(--font-geist-mono)", "var(--font-noto-sc)"],
       },

@@ -59,7 +59,7 @@ function RootLayoutContent({
           >
             <ThemeSync />
             <Navbar dict={dict} />
-            <main className="w-full h-auto px-4 sm:px-6 lg:px-8 relative" style={{ zIndex: 1 }}>
+            <main className="makcu-main-shell" style={{ zIndex: 1 }}>
               {children}
             </main>
             <Footer />
