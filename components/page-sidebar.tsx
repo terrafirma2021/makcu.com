@@ -1,0 +1,155 @@
+"use client";
+
+import { Card, CardContent } from "@/components/ui/card";
+import Link from "next/link";
+import type { Locale } from "@/lib/locale";
+import type { SectionItem } from "@/lib/sections-config";
+import { Dictionary } from "@/lib/dictionaries";
+import { DeviceInformationDisplay } from "./device-information-display";
+import { useMakcuConnection } from "./contexts/makcu-connection-provider";
+
+type PageSidebarProps = {
+  sections: SectionItem[];
+  currentPage: string;
+  lang: Locale;
+  dict: Dictionary;
+};
+
+/**
+ * Reusable sidebar component for individual pages.
+ * Shows sections filtered for the current page.
+ */
+export default function PageSidebar({
+  sections,
+  currentPage,
+  lang,
+  dict,
+}: PageSidebarProps) {
+  const { status, mode } = useMakcuConnection();
+  
+  // Filter sections based on connection mode
+  const filteredSections = sections.filter((section) => {
+    // Hide firmware-selection unless in flash mode
+    if (section.id === "firmware-selection") {
+      return status === "connected" && mode === "flash";
+    }
+    // Hide device-test unless in normal mode
+    if (section.id === "device-test") {
+      return status === "connected" && mode === "normal";
+    }
+    // Hide serial-terminal unless in normal or flash mode
+    if (section.id === "serial-terminal") {
+      return status === "connected" && (mode === "normal" || mode === "flash");
+    }
+    // Device information shows when connected in normal mode
+    if (section.id === "device-information") {
+      return status === "connected" && mode === "normal";
+    }
+    return true;
+  });
+  
+  const getLabel = (labelKey: string): string => {
+    // Navigate through the dictionary using the key path
+    const keys = labelKey.split(".");
+    let value: any = dict;
+    
+    for (const key of keys) {
+      if (value === null || value === undefined) {
+        // Try to provide a human-readable fallback
+        const lastKey = keys[keys.length - 1];
+        if (lastKey.includes("_")) {
+          // Convert snake_case to Title Case as fallback
+          return lastKey
+            .split("_")
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(" ");
+        }
+        return lastKey.charAt(0).toUpperCase() + lastKey.slice(1);
+      }
+      value = value[key];
+    }
+    
+    if (value === undefined || value === null || typeof value !== "string") {
+      // Try to provide a human-readable fallback
+      const lastKey = keys[keys.length - 1];
+      if (lastKey.includes("_")) {
+        // Convert snake_case to Title Case as fallback
+        return lastKey
+          .split("_")
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(" ");
+      }
+      return lastKey.charAt(0).toUpperCase() + lastKey.slice(1);
+    }
+    
+    return value;
+  };
+
+  return (
+    <aside>
+      <Card className="border-border/60 bg-card/90 shadow-lg">
+        <CardContent className="p-5">
+          <nav className="space-y-3 text-sm">
+            {filteredSections.map((section) => {
+              const isDeviceInformation = section.id === "device-information" && currentPage === "/device-control";
+              const hasChildren = section.children && section.children.length > 0;
+              
+              return (
+                <div key={section.id} className="space-y-2">
+                  {isDeviceInformation ? (
+                    <>
+                      <div className="font-medium text-black dark:text-white">
+                        {getLabel(section.labelKey)}
+                      </div>
+                      <div className="mt-2 pt-2 border-t border-border/60">
+                        <DeviceInformationDisplay lang={lang} variant="inline" />
+                      </div>
+                      {hasChildren && section.children && (
+                        <ul className="space-y-1 border-l border-border/60 pl-3 text-xs text-muted-foreground mt-2">
+                          {section.children.map((child) => (
+                            <li key={child.id}>
+                              <Link
+                                href={`/${lang}${currentPage}#${child.id}`}
+                                className="transition hover:text-black dark:hover:text-white"
+                              >
+                                {getLabel(child.labelKey)}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <Link
+                        href={`/${lang}${currentPage}#${section.id}`}
+                        className="font-medium text-black dark:text-white transition"
+                      >
+                        {getLabel(section.labelKey)}
+                      </Link>
+                      {hasChildren && section.children && (
+                        <ul className="space-y-1 border-l border-border/60 pl-3 text-xs text-muted-foreground">
+                          {section.children.map((child) => (
+                            <li key={child.id}>
+                              <Link
+                                href={`/${lang}${currentPage}#${child.id}`}
+                                className="transition hover:text-black dark:hover:text-white"
+                              >
+                                {getLabel(child.labelKey)}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </nav>
+        </CardContent>
+      </Card>
+    </aside>
+  );
+}
+
