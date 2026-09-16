@@ -1,4 +1,4 @@
-﻿const DISCORD_INVITE_URL = "https://discord.com/invite/makcu";
+﻿const DISCORD_INVITE_URL = "https://discord.gg/wjyTaqCbHm";
 
 export default function DiscordRedirect() {
   return (
