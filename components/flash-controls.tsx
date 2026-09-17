@@ -159,6 +159,13 @@ export function FlashControls({ lang, dict, onFlashLog }: FlashControlsProps) {
         `flashSize=${flashOptions.flashSize ?? "default"} eraseAll=${!!flashOptions.eraseAll} compress=${!!flashOptions.compress}`
       );
 
+      handleFlashLog("Erasing full NOR flash...");
+      if (!loader.IS_STUB) {
+        await loader.runStub();
+      }
+      await loader.eraseFlash();
+      handleFlashLog("Full NOR erase complete");
+
       await loader.writeFlash(flashOptions);
 
       await loader.after();
